@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<!--
+Waiting room. View currently joined players,
+add AI players, start game once ready.
+-->
+<html>
+  <head>
+    <title>Tres</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="constants.js"></script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="The classic online multiplayer Uno ripoff"
+    />
+
+    <meta
+      property="og:image"
+      content="https://knosmos.github.io/tres/assets/preview.png"
+    />
+    <meta
+      property="twitter:image"
+      content="https://knosmos.github.io/tres/assets/preview.png"
+    />
+    <meta property="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div id="container">
+      <h1>StackUnoflow</h1>
+      <h2 class="info">Waiting to start...</h2>
+      <div class="box">
+        <h2>JOIN CODE: <span id="game-id"></span></h2>
+        <div onclick="copyInvite()" style="cursor: pointer">
+          <h2 class="info">Invite link (click to copy):</h2>
+          <h3><a id="invite-link" target="_blank"></a></h3>
+        </div>
+      </div>
+      <div id="div-wrapper">
+        <div class="box">
+          <h2>CONNECTED PLAYERS</h2>
+          <i>If you are the host, click to remove a player</i>
+          <ul id="players"></ul>
+        </div>
+        <div class="box">
+          <button onclick="addAI()">ADD AI PLAYER</button>
+          <br />
+          <button onclick="startGame()">START GAME</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Get query string parameters (https://stackoverflow.com/questions/901115)
+      let urlParams = new URLSearchParams(window.location.search);
+      let game = urlParams.get("game");
+      let id = urlParams.get("id");
+
+      // Display game ID
+      $("#game-id").html(game);
+      $("#invite-link").html("knosmos.github.io/tres/join?game=" + game);
+      $("#invite-link").attr(
+        "href",
+        "https://knosmos.github.io/tres/join.html?game=" + game
+      );
+
+      /*
+            Add an AI player to the game
+            */
+      function addAI() {
+        $.post(
+          SERVERURL + "addAI",
+          JSON.stringify({
+            game: game,
+          }),
+          getPlayers
+        );
+      }
+
+      /*
+            Start the game
+            */
+      function startGame() {
+        $.post(
+          SERVERURL + "start",
+          JSON.stringify({
+            game: game,
+          }),
+          getPlayers
+        );
+      }
+
+      /*
+            This gets all names of all the players
+            currently connected to the game. It also
+            checks if the game has started yet; if it has,
+            it redirects the user to the game page.
+            */
+      function getPlayers() {
+        $.get(SERVERURL + "lobby?game=" + game + "&id=" + id, function (data) {
+          // clear the current player list
+          $("#players").html("");
+          players = JSON.parse(data["players"].replace(/'/g, '"'));
+          for (let i = 0; i < players.length; i++) {
+            // add back each player
+            $("#players").append(
+              `<li onclick="kickPlayer(${i})">${players[i]}</li>`
+            );
+          }
+
+          // check for game start
+          if (data["start"] == "yes") {
+            location.href = `game.html?id=${id}&game=${game}`;
+          }
+
+          // check if player was kicked
+          if (data["kicked"] == "yes") {
+            alert("You have been kicked from game " + game);
+            location.href = "index.html";
+          }
+        });
+      }
+
+      setInterval(getPlayers, 1000);
+      getPlayers();
+
+      // Kick a player
+      function kickPlayer(num) {
+        $.post(
+          SERVERURL + "remove",
+          JSON.stringify({
+            game: game,
+            num: num,
+            id: id,
+          }),
+          function (msg) {
+            getPlayers();
+            if (!msg.startsWith("Successfully")) {
+              alert(msg);
+            }
+          }
+        );
+      }
+
+      function copyInvite() {
+        navigator.clipboard.writeText(
+          "https://knosmos.github.io/tres/join.html?game=" + game
+        );
+      }
+    </script>
+  </body>
+</html>
